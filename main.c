@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <signal.h>
-
+#include <sys/wait.h>
 #define BUFFER_SIZE 100
 
 void handle_interrupt(int signal) {
@@ -116,14 +116,15 @@ void rmdir_func(char *path) {
 void cd(char *path) {
     if (chdir(path) != 0) {
         perror("(Error) Cd: ");
-    }
+   }
 }
-
 int main() {
     char command[BUFFER_SIZE];
     char fullCommand[BUFFER_SIZE + 20];  // 경로 포함한 명령어 저장할 변수
-	signal(SIGINT, handle_interrupt);
-	signal(SIGQUIT, handle_interrupt);
+
+    signal(SIGINT, handle_interrupt);
+    signal(SIGQUIT, handle_interrupt);
+
     while (1) {
         char cwd[BUFFER_SIZE];
         getcwd(cwd, sizeof(cwd));  // 현재 작업 디렉토리 경로 얻기
@@ -135,76 +136,65 @@ int main() {
         command[strcspn(command, "\n")] = '\0';
 
         if (strcmp(command, "exit") == 0) {
+	    printf(" \n bye bye \n " );
             break;  // "exit" 입력 시 종료
         }
 
-        if (strcmp(command, "ls") == 0) {
+        // 파이프라인 또는 리다이렉션 기호 확인
+        char* pipe = strchr(command, '|');
+        char* redirect_in = strchr(command, '<');
+        char* redirect_out = strchr(command, '>');
+
+        if (pipe != NULL || redirect_in != NULL || redirect_out != NULL) {
+            // 파이프라인 또는 리다이렉션을 포함한 명령어 실행
+            pid_t pid = fork();  // 자식 프로세스 생성
+            if (pid == -1) {
+                perror("(Error) fork: ");
+                continue;
+            } else if (pid == 0) {
+                // 자식 프로세스에서 명령어 실행
+                system(command);
+                exit(0);  // 자식 프로세스 종료
+            } else {
+                // 부모 프로세스는 자식 프로세스의 종료를 기다림
+                wait(NULL);
+            }
+        } else if (strcmp(command, "ls") == 0) {
             char *args[] = {"", NULL};  // 첫 번째 인자는 실행 파일명이므로 비워둠
             ls(1, args);  // ls 함수 호출
-            continue;
-        }
-
-        if (strcmp(command, "pwd") == 0) {
+        } else if (strcmp(command, "pwd") == 0) {
             pwd();  // pwd 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "rm ", 3) == 0) {
+        } else if (strncmp(command, "rm ", 3) == 0) {
             char *path = command + 3;  // "rm "을 제외한 경로
             rm(path);  // rm 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "mv ", 3) == 0) {
+        } else if (strncmp(command, "mv ", 3) == 0) {
             char *src = strtok(command + 3, " ");
             char *dest = strtok(NULL, " ");
             mv(src, dest);  // mv 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "cat ", 4) == 0) {
+        } else if (strncmp(command, "cat ", 4) == 0) {
             char *path = command + 4;  // "cat "을 제외한 경로
             cat(path);  // cat 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "cp ", 3) == 0) {
+        } else if (strncmp(command, "cp ", 3) == 0) {
             char *src = strtok(command + 3, " ");
             char *dest = strtok(NULL, " ");
             cp(src, dest);  // cp 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "ln ", 3) == 0) {
+        } else if (strncmp(command, "ln ", 3) == 0) {
             char *src = strtok(command + 3, " ");
             char *dest = strtok(NULL, " ");
             ln(src, dest);  // ln 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "mkdir ", 6) == 0) {
+        } else if (strncmp(command, "mkdir ", 6) == 0) {
             char *path = command + 6;  // "mkdir "을 제외한 경로
             mkdir_func(path);  // mkdir 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "rmdir ", 6) == 0) {
+        } else if (strncmp(command, "rmdir ", 6) == 0) {
             char *path = command + 6;  // "rmdir "을 제외한 경로
             rmdir_func(path);  // rmdir 함수 호출
-            continue;
-        }
-
-        if (strncmp(command, "cd ", 3) == 0) {
+        } else if (strncmp(command, "cd ", 3) == 0) {
             char *path = command + 3;  // "cd "을 제외한 경로
             cd(path);  // cd 함수 호출
-            continue;
+        } else {
+            // 일반적인 명령어 실행
+            system(command);
         }
-
-        // 경로를 포함한 명령어 생성
-        printf(fullCommand, BUFFER_SIZE + 20, "%s/%s", cwd, command);
-
-        // 입력받은 명령어 실행
-        system(fullCommand);
     }
 
     return 0;
