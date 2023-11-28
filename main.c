@@ -4,15 +4,14 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/wait.h>
+#include <signal.h>
+
 #define BUFFER_SIZE 100
-int interrupted = 0;
 
 void handle_interrupt(int signal) {
-    interrupted = 1;
+	printf("\n 인터럽트 시그널이 발생하였습니다.\n");
+    exit(signal);  // 프로그램 종료
 }
-
 
 void ls(int narg, char **argv) {
     char temp[256];
@@ -120,95 +119,21 @@ void cd(char *path) {
     }
 }
 
-
-void handle_pipes(char *command) {
-    char *args[BUFFER_SIZE];
-    int i = 0;
-
-    args[i] = strtok(command, "|");
-    while (args[i] != NULL) {
-        i++;
-        args[i] = strtok(NULL, "|");
-    }
-    args[i] = NULL;
-
-    int num_pipes = i - 1;
-
-    int pipefds[2 * num_pipes];
-    for (i = 0; i < num_pipes; i++) {
-        if (pipe(pipefds + i * 2) < 0) {
-            perror("(Error) Pipe: ");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    int pid;
-    int status;
-    int fd_in = 0;
-
-    for (i = 0; i < num_pipes + 1; i++) {
-        if ((pid = fork()) < 0) {
-            perror("(Error) Fork: ");
-            exit(EXIT_FAILURE);
-        } else if (pid == 0) {
-            if (i < num_pipes) {
-                if (dup2(pipefds[i * 2 + 1], 1) < 0) {
-                    perror("(Error) Dup2: ");
-                    exit(EXIT_FAILURE);
-                }
-            }
-
-            if (i != 0) {
-                if (dup2(fd_in, 0) < 0) {
-                    perror("(Error) Dup2: ");
-                    exit(EXIT_FAILURE);
-                }
-            }
-
-            for (int j = 0; j < 2 * num_pipes; j++) {
-                close(pipefds[j]);
-            }
-
-
-            exit(EXIT_FAILURE);
-        } else {
-            waitpid(pid, &status, 0);
-
-            for (int j = 0; j < 2 * num_pipes; j++) {
-                close(pipefds[j]);
-            }
-
-            fd_in = pipefds[i * 2];
-        }
-    }
-}
-
 int main() {
     char command[BUFFER_SIZE];
-    char fullCommand[BUFFER_SIZE + 20];
-
+    char fullCommand[BUFFER_SIZE + 20];  // 경로 포함한 명령어 저장할 변수
+	signal(SIGINT, handle_interrupt);
+	signal(SIGQUIT, handle_interrupt);
     while (1) {
         char cwd[BUFFER_SIZE];
-	getcwd(cwd, sizeof(cwd));
-        printf("%s $ ", cwd);  
-        fgets(command, BUFFER_SIZE, stdin); 
+        getcwd(cwd, sizeof(cwd));  // 현재 작업 디렉토리 경로 얻기
 
+        printf("%s $ ", cwd);  // 현재 작업 디렉토리 경로와 함께 프롬프트 출력
+        fgets(command, BUFFER_SIZE, stdin);  // 사용자 입력 받기
+
+        // 개행 문자 제거
         command[strcspn(command, "\n")] = '\0';
-        if (strstr(command, "|") != NULL) {
-            handle_pipes(command);  // 파이프라인 처리 함수 호출
-            continue;
-        }
 
-        int pid = fork();
-        if (pid < 0) {
-            perror("(Error) Fork: ");
-            exit(EXIT_FAILURE);
-        } else if (pid == 0) {
-            exit(EXIT_SUCCESS);
-        } else {
-            int status;
-            waitpid(pid, &status, 0);
-        }
         if (strcmp(command, "exit") == 0) {
             break;  // "exit" 입력 시 종료
         }
@@ -275,13 +200,12 @@ int main() {
             continue;
         }
 
-        if (strstr(command, "|") != NULL) {
-            handle_pipes(command);
-            continue;
-        }
-	printf(fullCommand, BUFFER_SIZE + 20, "%s/%s 2>/dev/null", cwd, command);
-	system(fullCommand);
-}
-	return 0;
-}
+        // 경로를 포함한 명령어 생성
+        printf(fullCommand, BUFFER_SIZE + 20, "%s/%s", cwd, command);
 
+        // 입력받은 명령어 실행
+        system(fullCommand);
+    }
+
+    return 0;
+}
