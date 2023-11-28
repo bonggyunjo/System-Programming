@@ -1,3 +1,10 @@
+/**
+- System Programming
+- Team project 1
+- 20213012 조은진 (팀장)
+- 20193182 조봉균 (팀원)
+- 20213074 백현서 (팀원)
+**/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +17,7 @@
 
 void handle_interrupt(int signal) {
 	printf("\n 인터럽트 시그널이 발생하였습니다.\n");
-    exit(signal);  // 프로그램 종료
+    exit(signal);  //
 }
 
 void ls(int narg, char **argv) {
@@ -143,23 +150,19 @@ int main() {
             break;  // "exit" 입력 시 종료
         }
 
-        // 파이프라인 또는 리다이렉션 기호 확인
         char* pipe = strchr(command, '|');
         char* redirect_in = strchr(command, '<');
         char* redirect_out = strchr(command, '>');
 
         if (pipe != NULL || redirect_in != NULL || redirect_out != NULL) {
-            // 파이프라인 또는 리다이렉션을 포함한 명령어 실행
             pid_t pid = fork();  // 자식 프로세스 생성
             if (pid == -1) {
                 perror("(Error) fork: ");
                 continue;
             } else if (pid == 0) {
-                // 자식 프로세스에서 명령어 실행
                 system(command);
                 exit(0);  // 자식 프로세스 종료
             } else {
-                // 부모 프로세스는 자식 프로세스의 종료를 기다림
                 wait(NULL);
             }
         } else if (strcmp(command, "ls") == 0) {
@@ -195,10 +198,8 @@ int main() {
             char *path = command + 3;  // "cd "을 제외한 경로
             cd(path);  // cd 함수 호출
 	}else if (strcmp(command, "&") != 0  ) {
-            // 백그라운드로 돌아가는 함수 호출
             background();
         } else {
-            // 일반적인 명령어 실행
             system(command);
         }
     }
