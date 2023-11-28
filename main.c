@@ -12,20 +12,7 @@ int interrupted = 0;
 void handle_interrupt(int signal) {
     interrupted = 1;
 }
-void execute_command(char *command) {
-    char *args[BUFFER_SIZE];
-    int i = 0;
 
-    args[i] = strtok(command, " ");
-    while (args[i] != NULL) {
-        i++;
-        args[i] = strtok(NULL, " ");
-    }
-    args[i] = NULL;
-
-    execvp(args[0], args);
-    perror("(Error) Execution: ");
-}
 
 void ls(int narg, char **argv) {
     char temp[256];
@@ -182,7 +169,6 @@ void handle_pipes(char *command) {
                 close(pipefds[j]);
             }
 
-            execute_command(args[i]);
 
             exit(EXIT_FAILURE);
         } else {
@@ -199,34 +185,27 @@ void handle_pipes(char *command) {
 
 int main() {
     char command[BUFFER_SIZE];
-    char fullCommand[BUFFER_SIZE + 20];  // 경로 포함한 명령어 저장할 변수
+    char fullCommand[BUFFER_SIZE + 20];
 
     while (1) {
         char cwd[BUFFER_SIZE];
-        getcwd(cwd, sizeof(cwd));  // 현재 작업 디렉토리 경로 얻기
+	getcwd(cwd, sizeof(cwd));
+        printf("%s $ ", cwd);  
+        fgets(command, BUFFER_SIZE, stdin); 
 
-        printf("%s $ ", cwd);  // 현재 작업 디렉토리 경로와 함께 프롬프트 출력
-        fgets(command, BUFFER_SIZE, stdin);  // 사용자 입력 받기
-
-        // 개행 문자 제거
         command[strcspn(command, "\n")] = '\0';
-	 // 파이프라인 명령어인지 확인
         if (strstr(command, "|") != NULL) {
             handle_pipes(command);  // 파이프라인 처리 함수 호출
             continue;
         }
 
-        // 파이프라인이 아닌 일반 명령어 처리
         int pid = fork();
         if (pid < 0) {
             perror("(Error) Fork: ");
             exit(EXIT_FAILURE);
         } else if (pid == 0) {
-            // 자식 프로세스에서 명령어 실행
-            execute_command(command);
             exit(EXIT_SUCCESS);
         } else {
-            // 부모 프로세스에서 자식 프로세스의 종료를 기다림
             int status;
             waitpid(pid, &status, 0);
         }
@@ -300,12 +279,8 @@ int main() {
             handle_pipes(command);
             continue;
         }
-
-        // 경로를 포함한 명령어 생성
-        printf(fullCommand, BUFFER_SIZE + 20, "%s/%s", cwd, command);
-
-        // 입력받은 명령어 실행
-        system(fullCommand);
+	printf(fullCommand, BUFFER_SIZE + 20, "%s/%s 2>/dev/null", cwd, command);
+	system(fullCommand);
 }
 	return 0;
 }
