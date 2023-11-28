@@ -118,6 +118,9 @@ void cd(char *path) {
         perror("(Error) Cd: ");
    }
 }
+void background() {
+    printf("\n함수가 백그라운드로 돌아갑니다.\n");
+}
 int main() {
     char command[BUFFER_SIZE];
     char fullCommand[BUFFER_SIZE + 20];  // 경로 포함한 명령어 저장할 변수
@@ -191,6 +194,9 @@ int main() {
         } else if (strncmp(command, "cd ", 3) == 0) {
             char *path = command + 3;  // "cd "을 제외한 경로
             cd(path);  // cd 함수 호출
+	}else if (strcmp(command, "&") != 0  ) {
+            // 백그라운드로 돌아가는 함수 호출
+            background();
         } else {
             // 일반적인 명령어 실행
             system(command);
